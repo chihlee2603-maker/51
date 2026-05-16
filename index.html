@@ -2,236 +2,200 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WePlay 模擬器 - 能量大戰</title>
+    <title>國考上榜跑酷遊戲</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
-        body { font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
-        .weplay-gradient { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        .cell-pulse { animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-        canvas { touch-action: none; }
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        #gameCanvas { background: linear-gradient(to bottom, #87CEEB, #f0f9ff); display: block; margin: 0 auto; border-bottom: 10px solid #5d4037; }
+        .ui-layer { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; }
     </style>
 </head>
-<body class="bg-[#F8F9FD] min-h-screen">
+<body class="bg-gray-100">
 
-    <div class="weplay-gradient text-white p-4 flex justify-between items-center shadow-lg rounded-b-3xl">
-        <div class="flex items-center gap-3">
-            <div class="w-12 h-12 bg-white rounded-full border-2 border-amber-400 overflow-hidden shadow-inner">
-                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Player">
-            </div>
-            <div>
-                <p class="text-xs opacity-80">房間號碼</p>
-                <p class="font-black text-lg">#2026_WIN</p>
-            </div>
-        </div>
-        <div class="flex gap-2">
-            <button class="bg-white/20 p-2 rounded-full"><i data-lucide="mic"></i></button>
-            <button class="bg-white/20 p-2 rounded-full"><i data-lucide="settings"></i></button>
+    <div class="ui-layer">
+        <h1 class="text-2xl font-bold text-blue-900 shadow-sm">🏃 衝吧！國考上榜路</h1>
+        <p class="text-sm text-gray-600">空白鍵 (Space) 或 點擊畫面：跳躍</p>
+        <div id="score" class="text-3xl font-black text-orange-600 mt-2">分數: 0</div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="gameOver" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
+        <div class="bg-white p-8 rounded-2xl text-center shadow-2xl">
+            <h2 class="text-4xl font-bold text-red-600 mb-4">挑戰失敗！</h2>
+            <p id="finalScore" class="text-xl mb-6 text-gray-700 font-medium"></p>
+            <p class="text-gray-500 mb-6 italic text-sm">「壓力太大了嗎？別怕，找對方法你就能過關！」</p>
+            <button onclick="resetGame()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full text-lg transition-transform hover:scale-105 cursor-pointer">
+                重新挑戰
+            </button>
         </div>
     </div>
 
-    <main class="max-w-md mx-auto p-4 mt-4">
-        
-        <div class="flex justify-between mb-6">
-            <div id="p1-card" class="bg-white p-4 rounded-2xl shadow-md border-b-4 border-blue-500 w-[45%] text-center transition-all">
-                <div class="text-blue-600 mb-1"><i data-lucide="user" class="mx-auto"></i></div>
-                <p class="font-bold">玩家 1</p>
-                <p class="text-xs text-gray-400">正在思考...</p>
-            </div>
-            <div class="flex items-center text-gray-300 font-black italic text-2xl">VS</div>
-            <div id="p2-card" class="bg-white p-4 rounded-2xl shadow-md border-b-4 border-gray-200 w-[45%] text-center transition-all opacity-50">
-                <div class="text-red-600 mb-1"><i data-lucide="user" class="mx-auto"></i></div>
-                <p class="font-bold">玩家 2</p>
-                <p class="text-xs text-gray-400">等待中</p>
-            </div>
-        </div>
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreElement = document.getElementById('score');
+    const gameOverScreen = document.getElementById('gameOver');
+    const finalScoreElement = document.getElementById('finalScore');
 
-        <div class="bg-white rounded-3xl p-4 shadow-2xl relative border-4 border-white">
-            <canvas id="gameBoard" class="mx-auto rounded-xl bg-gray-50"></canvas>
-            
-            <div id="start-overlay" class="absolute inset-0 bg-black/60 rounded-3xl flex flex-col items-center justify-center text-white p-6 text-center z-10">
-                <h2 class="text-3xl font-black mb-4">能量爆裂戰</h2>
-                <p class="mb-6 opacity-90">點擊空格增加能量，滿了就會向四周爆裂！佔領所有格子來獲勝。</p>
-                <button onclick="startGame()" class="bg-amber-400 text-amber-900 font-black px-10 py-4 rounded-full text-xl shadow-lg hover:scale-105 active:scale-95 transition-all">
-                    準備好了！
-                </button>
-            </div>
-        </div>
+    // 遊戲參數
+    canvas.width = window.innerWidth;
+    canvas.height = 400;
 
-        <div class="mt-8 flex justify-around">
-            <button class="flex flex-col items-center gap-1 text-gray-400">
-                <div class="bg-white p-4 rounded-full shadow-md"><i data-lucide="message-square"></i></div>
-                <span class="text-xs font-bold">聊天</span>
-            </button>
-            <button class="flex flex-col items-center gap-1 text-gray-400">
-                <div class="bg-white p-4 rounded-full shadow-md"><i data-lucide="smile"></i></div>
-                <span class="text-xs font-bold">表情</span>
-            </button>
-            <button onclick="resetGame()" class="flex flex-col items-center gap-1 text-gray-400">
-                <div class="bg-white p-4 rounded-full shadow-md"><i data-lucide="refresh-cw"></i></div>
-                <span class="text-xs font-bold">重開</span>
-            </button>
-        </div>
-    </main>
+    let score = 0;
+    let gameActive = true;
+    let gameSpeed = 5;
+    let gravity = 0.8;
+    
+    // 考生 (玩家)
+    const player = {
+        x: 50,
+        y: 300,
+        width: 40,
+        height: 60,
+        dy: 0,
+        jumpForce: -15,
+        grounded: false,
+        color: '#2563eb'
+    };
 
-    <script>
-        const canvas = document.getElementById('gameBoard');
-        const ctx = canvas.getContext('2d');
-        const rows = 6;
-        const cols = 5;
-        const cellSize = 60;
-        
-        canvas.width = cols * cellSize;
-        canvas.height = rows * cellSize;
+    // 障礙物 (代表國考壓力)
+    const obstacles = [];
+    const obstacleTypes = [
+        { text: "法條", color: "#dc2626" },
+        { text: "熬夜", color: "#4b5563" },
+        { text: "落榜壓力", color: "#991b1b" }
+    ];
 
-        let currentPlayer = 1;
-        let board = [];
-        let isExploding = false;
-
-        // 初始化棋盤
-        function initBoard() {
-            board = [];
-            for (let r = 0; r < rows; r++) {
-                board[r] = [];
-                for (let c = 0; c < cols; c++) {
-                    let threshold = 4;
-                    if ((r === 0 || r === rows - 1) && (c === 0 || c === cols - 1)) threshold = 2; // 角落
-                    else if (r === 0 || r === rows - 1 || c === 0 || c === cols - 1) threshold = 3; // 邊緣
-                    board[r][c] = { count: 0, player: 0, threshold: threshold };
-                }
-            }
-            draw();
-        }
-
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            for (let r = 0; r < rows; r++) {
-                for (let c = 0; c < cols; c++) {
-                    const cell = board[r][c];
-                    const x = c * cellSize;
-                    const y = r * cellSize;
-
-                    // 畫格子背景
-                    ctx.strokeStyle = '#E5E7EB';
-                    ctx.strokeRect(x, y, cellSize, cellSize);
-
-                    if (cell.count > 0) {
-                        ctx.fillStyle = cell.player === 1 ? '#3B82F6' : '#EF4444';
-                        
-                        // 繪製能量球 (根據數量分布)
-                        const radius = 8;
-                        const centerX = x + cellSize / 2;
-                        const centerY = y + cellSize / 2;
-
-                        if (cell.count === 1) {
-                            ctx.beginPath(); ctx.arc(centerX, centerY, radius, 0, Math.PI*2); ctx.fill();
-                        } else if (cell.count === 2) {
-                            ctx.beginPath(); ctx.arc(centerX-12, centerY, radius, 0, Math.PI*2); ctx.fill();
-                            ctx.beginPath(); ctx.arc(centerX+12, centerY, radius, 0, Math.PI*2); ctx.fill();
-                        } else if (cell.count === 3) {
-                            ctx.beginPath(); ctx.arc(centerX, centerY-10, radius, 0, Math.PI*2); ctx.fill();
-                            ctx.beginPath(); ctx.arc(centerX-12, centerY+10, radius, 0, Math.PI*2); ctx.fill();
-                            ctx.beginPath(); ctx.arc(centerX+12, centerY+10, radius, 0, Math.PI*2); ctx.fill();
-                        }
-                    }
-                }
-            }
-        }
-
-        canvas.addEventListener('click', (e) => {
-            if (isExploding) return;
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            const c = Math.floor(x / cellSize);
-            const r = Math.floor(y / cellSize);
-
-            if (board[r][c].player === 0 || board[r][c].player === currentPlayer) {
-                addAtom(r, c);
-                switchPlayer();
-            }
+    function spawnObstacle() {
+        if (!gameActive) return;
+        const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+        obstacles.push({
+            x: canvas.width,
+            y: canvas.height - 50,
+            width: 80,
+            height: 40,
+            text: type.text,
+            color: type.color
         });
+        
+        // 隨機生成下一個障礙物的時間 (1.5秒 - 3秒)
+        setTimeout(spawnObstacle, Math.random() * 1500 + 1000);
+    }
 
-        async function addAtom(r, c) {
-            isExploding = true;
-            board[r][c].count++;
-            board[r][c].player = currentPlayer;
+    function update() {
+        if (!gameActive) return;
 
-            if (board[r][c].count >= board[r][c].threshold) {
-                await explode(r, c);
+        // 物理力：跳躍與重力
+        player.dy += gravity;
+        player.y += player.dy;
+
+        // 落地檢測
+        if (player.y + player.height > canvas.height) {
+            player.y = canvas.height - player.height;
+            player.dy = 0;
+            player.grounded = true;
+        }
+
+        // 移動障礙物
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            obstacles[i].x -= gameSpeed;
+
+            // 碰撞檢測
+            if (
+                player.x < obstacles[i].x + obstacles[i].width &&
+                player.x + player.width > obstacles[i].x &&
+                player.y < obstacles[i].y + obstacles[i].height &&
+                player.y + player.height > obstacles[i].y
+            ) {
+                endGame();
             }
-            
-            draw();
-            isExploding = false;
-            checkWinner();
-        }
 
-        async function explode(r, c) {
-            board[r][c].count = 0;
-            board[r][c].player = 0;
-            draw();
-
-            const neighbors = [[r-1, c], [r+1, c], [r, c-1], [r, c+1]];
-            const promises = [];
-
-            for (const [nr, nc] of neighbors) {
-                if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
-                    board[nr][nc].player = currentPlayer;
-                    board[nr][nc].count++;
-                    if (board[nr][nc].count >= board[nr][nc].threshold) {
-                        promises.push(new Promise(res => setTimeout(() => res(explode(nr, nc)), 150)));
-                    }
-                }
-            }
-            await Promise.all(promises);
-            draw();
-        }
-
-        function switchPlayer() {
-            currentPlayer = currentPlayer === 1 ? 2 : 1;
-            document.getElementById('p1-card').classList.toggle('opacity-50', currentPlayer === 2);
-            document.getElementById('p1-card').classList.toggle('border-blue-500', currentPlayer === 1);
-            document.getElementById('p1-card').classList.toggle('border-gray-200', currentPlayer === 2);
-            
-            document.getElementById('p2-card').classList.toggle('opacity-50', currentPlayer === 1);
-            document.getElementById('p2-card').classList.toggle('border-red-500', currentPlayer === 2);
-            document.getElementById('p2-card').classList.toggle('border-gray-200', currentPlayer === 1);
-        }
-
-        function startGame() {
-            document.getElementById('start-overlay').classList.add('hidden');
-            initBoard();
-        }
-
-        function resetGame() {
-            initBoard();
-            currentPlayer = 1;
-            document.getElementById('p1-card').classList.remove('opacity-50');
-            document.getElementById('p2-card').classList.add('opacity-50');
-        }
-
-        function checkWinner() {
-            let p1 = 0, p2 = 0, total = 0;
-            for (let r = 0; r < rows; r++) {
-                for (let c = 0; c < cols; c++) {
-                    if (board[r][c].player === 1) p1++;
-                    if (board[r][c].player === 2) p2++;
-                    total += board[r][c].count;
-                }
-            }
-            // 只有在棋盤上累積一定能量後才判斷輸贏
-            if (total > 2) {
-                if (p1 === 0) alert("玩家 2 獲勝！");
-                else if (p2 === 0) alert("玩家 1 獲勝！");
+            // 移除出鏡障礙物並加分
+            if (obstacles[i].x + obstacles[i].width < 0) {
+                obstacles.splice(i, 1);
+                score += 10;
+                scoreElement.innerText = `分數: ${score}`;
+                if (score % 50 === 0) gameSpeed += 0.5; // 難度緩慢增加
             }
         }
 
-        lucide.createIcons();
-        initBoard();
-    </script>
+        draw();
+        requestAnimationFrame(update);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 畫地平線
+        ctx.strokeStyle = "#5d4037";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height);
+        ctx.lineTo(canvas.width, canvas.height);
+        ctx.stroke();
+
+        // 畫考生 (簡化版：藍色小人)
+        ctx.fillStyle = player.color;
+        // 身體
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+        // 頭部
+        ctx.beginPath();
+        ctx.arc(player.x + player.width/2, player.y - 10, 15, 0, Math.PI * 2);
+        ctx.fill();
+        // 眼睛
+        ctx.fillStyle = "white";
+        ctx.fillRect(player.x + 25, player.y - 15, 5, 5);
+
+        // 畫障礙物
+        obstacles.forEach(ob => {
+            ctx.fillStyle = ob.color;
+            ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
+            ctx.fillStyle = "white";
+            ctx.font = "14px Arial";
+            ctx.fillText(ob.text, ob.x + 10, ob.y + 25);
+        });
+    }
+
+    function jump() {
+        if (player.grounded) {
+            player.dy = player.jumpForce;
+            player.grounded = false;
+        }
+    }
+
+    function endGame() {
+        gameActive = false;
+        gameOverScreen.classList.remove('hidden');
+        finalScoreElement.innerText = `最終上榜指數: ${score}`;
+    }
+
+    function resetGame() {
+        score = 0;
+        gameSpeed = 5;
+        obstacles.length = 0;
+        gameActive = true;
+        player.y = 300;
+        scoreElement.innerText = `分數: 0`;
+        gameOverScreen.classList.add('hidden');
+        update();
+    }
+
+    // 控制監聽
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') jump();
+    });
+
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        jump();
+    });
+
+    canvas.addEventListener('mousedown', jump);
+
+    // 啟動遊戲
+    spawnObstacle();
+    update();
+</script>
 </body>
 </html>
